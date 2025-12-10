@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>归藏易排盘系统（终极完整版）</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // ==================== 核心映射规则 ====================
+        const TIANGAN_TO_TRIGRAM = {
+            '甲': '乾', '乙': '坤', '丙': '艮', '丁': '兑',
+            '戊': '坎', '己': '离', '庚': '震', '辛': '巽',
+            '壬': '乾', '癸': '坤'
+        };
+        const DIZHI_TO_TRIGRAM = {
+            '子': '坎', '丑': '艮', '寅': '艮', '卯': '震',
+            '辰': '巽', '巳': '巽', '午': '离', '未': '坤',
+            '申': '坤', '酉': '兑', '戌': '乾', '亥': '乾'
+        };
+        const TRIGRAM_YAO = {
+            '乾': [1, 1, 1], '坤': [0, 0, 0], '艮': [1, 0, 0], '兑': [0, 1, 1],
+            '坎': [0, 1, 0], '离': [1, 0, 1], '震': [0, 0, 1], '巽': [1, 1, 0]
+        };
+        const DIRECTION_TO_TRIGRAM = {
+            '北': '坎', '东北': '艮', '东': '震', '东南': '巽',
+            '南': '离', '西南': '坤', '西': '兑', '西北': '乾'
+        };
+        const NUMBER_TO_TRIGRAM = {
+            0: '坤', 1: '艮', 2: '坎', 3: '巽', 4: '震', 5: '离', 6: '兑', 7: '乾'
+        };
+        const TRIGRAM_SYMBOL = {
+            '乾': '☰', '坤': '☷', '艮': '☶', '兑': '☱',
+            '坎': '☵', '离': '☲', '震': '☳', '巽': '☴'
+        };
+        const GAME_YEAR_MAP = {
+            '乾': {'大游年': '延年吉', '小游年': '絕體凶'},
+            '坎': {'大游年': '絕命凶', '小游年': '絕命凶'},
+            '艮': {'大游年': '生氣吉', '小游年': '生氣吉'},
+            '震': {'大游年': '禍害凶', '小游年': '五鬼凶'},
+            '巽': {'大游年': '五鬼凶', '小游年': '天醫吉'},
+            '离': {'大游年': '六煞凶', '小游年': '遊魂凶'},
+            '坤': {'大游年': '伏位吉', '小游年': '伏位吉'},
+            '兑': {'大游年': '天醫吉', '小游年': '福德吉'}
+        };
+        const TRIGRAM_TEXT = {
+            '乾': {
+                '卦辞': '乾，天也。健而不息，元亨利贞。',
+                '简易解读': '乾为天，刚健进取。得此卦者运势顺遂，适合开拓事业、坚持正道，忌刚愎自用，吉庆自至。',
+                '深度解读': '乾卦三爻皆阳，象征天道运行不息，对应“元亨利贞”四德。元为始生，亨为通达，利为适宜，贞为正固。得此卦者，本质具备刚健之德，行事需契合天道规律：初时宜立定长远目标（元），过程中保持通达包容（亨），决策时坚守适宜之道（利），终局时固守正道不变（贞）。大游年“延年吉”主事业长久、身体健康，小游年“絕體凶”警示需避免孤高自傲、脱离群众，应刚柔并济，方能发挥乾卦之吉。'
+            },
+            '坤': {
+                '卦辞': '坤，地也。顺而厚德，载物无疆。',
+                '简易解读': '坤为地，包容承载。运势平稳，适合积累德行、团结他人，循序渐进做事，忌急功近利，可获长久之福。',
+                '深度解读': '坤卦三爻皆阴，象征地道柔顺包容，承载万物而不居功。坤卦核心为“顺”——顺承天道、顺合人心、顺循规律。得此卦者，需秉持厚德载物之德，待人谦和、处事沉稳：在团队中宜扮演支撑角色，善于凝聚力量；在事业上宜稳扎稳打，积累人脉与资源；在生活中宜包容他人不足，以德服人。大游年“伏位吉”主安稳守成、运势绵长，小游年“伏位吉”强化“守正”之意，警示忌冒进冲动，顺时顺势则万事亨通。'
+            },
+            '艮': {
+                '卦辞': '艮，山也。止而不妄，守正待时。',
+                '简易解读': '艮为山，静止稳重。需知进退、守分寸，不宜强行冒进，待时机成熟再行动，可避祸得吉。',
+                '深度解读': '艮卦上爻阳、下两爻阴，象征山之静止沉稳，核心义为“止”——知止而后有定，定而后能静。得此卦者，当前阶段宜“止”不宜“动”：若处于困境，应停止盲目行动，反思问题根源；若面临选择，应停止犹豫徘徊，坚守正道等待时机；若事业小有成就，应停止扩张冒进，巩固现有成果。大游年“生氣吉”主贵人相助、机遇暗藏，小游年“生氣吉”主身心健康、家庭和睦，警示“止”非停滞不前，而是“止其所当止”，待时而动则一击必中。'
+            },
+            '兑': {
+                '卦辞': '兑，泽也。悦而和畅，交感相应。',
+                '简易解读': '兑为泽，喜悦和谐。人际关系顺遂，适合沟通协商、合作成事，保持诚信，吉庆自来。',
+                '深度解读': '兑卦上两爻阳、下爻阴，象征泽水滋养万物，万物欣然回应，核心义为“悦”——以和悦之心待人，以诚信之行处事。得此卦者，关键在“交感相应”：与人沟通需坦诚相待，避免虚言欺瞒；合作共事需互利共赢，不可独断专行；生活中需保持乐观心态，以喜悦之情感染他人。大游年“天醫吉”主健康顺遂、灾祸不侵，小游年“福德吉”主福禄双收、人际和睦，警示“悦”非迎合讨好，而是发自内心的真诚与包容，方能获得长久的和谐与福报。'
+            },
+            '坎': {
+                '卦辞': '坎，水也。险而不陷，习而有功。',
+                '简易解读': '坎为水，险阻重重。运势多波折，需谨慎行事、坚韧不拔，历经磨砺后可化险为夷。',
+                '深度解读': '坎卦中爻阳、上下两爻阴，象征水之流动不息、遇险而不滞，核心义为“险”与“习”——直面险阻、反复练习以应对险境。得此卦者，当前正处于困境或波折之中：事业上可能面临资金短缺、竞争激烈等问题，生活中可能遭遇人际关系紧张、健康隐患等困扰。大游年“絕命凶”主需警惕重大灾祸、事业危机，小游年“絕命凶”警示需防范健康受损、破财之灾。应对之法在于“习”：反复总结经验教训，提升自身能力；谨慎规划每一步，避免盲目决策；寻求他人帮助，借力化险，历经坎险后必能迎来通达。'
+            },
+            '离': {
+                '卦辞': '离，火也。明而不躁，文明以止。',
+                '简易解读': '离为火，光明照耀。头脑清晰、运势明朗，适合发挥才智、彰显德行，忌锋芒过露，吉祥顺遂。',
+                '深度解读': '离卦中爻阴、上下两爻阳，象征火之光明普照、温暖万物，核心义为“明”与“止”——明辨是非、知止不殆。得此卦者，具备聪明才智与洞察能力，适合从事文化、教育、创意等需要智慧的行业。行事需把握“明而不躁”：决策时需明辨利弊，不被表象迷惑；与人相处需光明磊落，不搞阴谋诡计；事业发展需“文明以止”，知进退、懂分寸，忌锋芒过露、骄傲自满。大游年“六煞凶”主需防范人际关系是非、口舌之争，小游年“遊魂凶”警示需避免心神不宁、决策摇摆，保持内心清明、行事有度则吉。'
+            },
+            '震': {
+                '卦辞': '震，雷也。动而有威，惊惧修省。',
+                '简易解读': '震为雷，变动警醒。运势有突发变动，需保持冷静、谨慎行事，及时反思修正，化危机为机遇。',
+                '深度解读': '震卦下爻阳、上两爻阴，象征雷声震动、警醒万物，核心义为“动”与“省”——突发变动、惊惧后修省。得此卦者，近期可能面临突发状况：事业上可能有职务变动、项目调整，生活中可能有意外事件、人际关系突变。大游年“禍害凶”主需防范小人作祟、事业阻碍，小游年“五鬼凶”警示需防范口舌是非、家庭不和。应对之法在于“惊惧修省”：面对变动不慌乱，保持冷静分析；事后及时反思自身不足，修正行为偏差；借助变动之力突破固有格局，将危机转化为成长的机遇，震卦之动虽有惊惧，实则为新生之兆。'
+            },
+            '巽': {
+                '卦辞': '巽，风也。顺而伸展，谦逊行事。',
+                '简易解读': '巽为风，柔顺灵活。运势平顺，适合顺势而为、灵活应变，待人谦逊，可获他人相助。',
+                '深度解读': '巽卦上两爻阳、下两爻阴，象征风之无孔不入、顺势而为，核心义为“顺”与“谦”——顺应时势、谦逊行事。得此卦者，性格柔顺而不失主见，做事灵活而不违背原则。事业上宜顺势而为，把握行业趋势与政策导向，借力发展；人际关系上宜谦逊有礼，尊重他人意见，善于倾听建议，方能获得贵人相助。大游年“五鬼凶”主需防范内心猜忌、人际误解，小游年“天醫吉”主健康顺遂、有贵人化解困境。警示“顺”非盲从，“谦”非卑微，需在柔顺中保持独立思考，在谦逊中坚守底线，方能发挥巽卦之利。'
+            }
+        };
+        // ==================== 工具函数 ====================
+        // 获取当前干支（已修复：修正索引偏移量，确保日辰干支准确）
+        function getCurrentGanZhi() {
+            const tiangan = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+            const dizhi = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+            const baseDate = new Date(1900, 0, 31); // 基准日不变（1900-01-31 甲午日）
+            const today = new Date();
+            const daysDiff = Math.floor((today - baseDate) / (1000 * 60 * 60 * 24));
+            
+            // 核心修复：修正天干/地支索引偏移量（原6/2错误，改为3/5）
+            let tgIndex = (3 + daysDiff) % 10;
+            let dzIndex = (5 + daysDiff) % 12;
+            
+            // 兼容负数取余（避免基准日之前的日期计算出错）
+            tgIndex = tgIndex < 0 ? tgIndex + 10 : tgIndex;
+            dzIndex = dzIndex < 0 ? dzIndex + 12 : dzIndex;
+            
+            return tiangan[tgIndex] + dizhi[dzIndex];
+        }
+        // 卦象计算（两卦归藏）
+        function trigramCalculate(g1, g2) {
+            const y1 = TRIGRAM_YAO[g1];
+            const y2 = TRIGRAM_YAO[g2];
+            const resultYao = y1.map((val, idx) => val === y2[idx] ? 0 : 1);
+            for (const [trigram, yao] of Object.entries(TRIGRAM_YAO)) {
+                if (yao.join() === resultYao.join()) {
+                    return trigram;
+                }
+            }
+            return null;
+        }
+        // 多卦归藏
+        function multipleTrigramCalculate(trigramList) {
+            if (trigramList.length < 2) return trigramList[0] || null;
+            return trigramList.reduce((result, trigram) => trigramCalculate(result, trigram));
+        }
+        // 解析生辰八字（优化：支持更多分隔符自动清理）
+        function parseBaZi(baziStr) {
+            // 清理所有非干支字符（保留甲乙丙丁等干支，移除空格、逗号、竖线等）
+            const cleaned = baziStr.replace(/[^\u4E00-\u9FA5]/g, '');
+            if (cleaned.length !== 8) throw new Error("生辰八字需输入8个干支字符（如：甲子甲子甲子甲子）");
+            const groups = [];
+            for (let i = 0; i < 8; i += 2) {
+                groups.push(cleaned.slice(i, i + 2));
+            }
+            return groups;
+        }
+        // 计算命卦
+        function calculateMingGua(baziStr) {
+            const baziGroups = parseBaZi(baziStr);
+            const step1Trigrams = [];
+            const log = [];
+            for (const ganzhi of baziGroups) {
+                const tgGua = TIANGAN_TO_TRIGRAM[ganzhi[0]];
+                const dzGua = DIZHI_TO_TRIGRAM[ganzhi[1]];
+                const groupResult = trigramCalculate(tgGua, dzGua);
+                step1Trigrams.push(groupResult);
+                log.push(`  ${ganzhi} → ${tgGua}${TRIGRAM_SYMBOL[tgGua]} + ${dzGua}${TRIGRAM_SYMBOL[dzGua]} → ${groupResult}${TRIGRAM_SYMBOL[groupResult]}`);
+            }
+            const mingGua = multipleTrigramCalculate(step1Trigrams);
+            log.push(`  命卦归藏结果 → ${mingGua}${TRIGRAM_SYMBOL[mingGua]}`);
+            return { mingGua, log };
+        }
+        // 计算日辰卦
+        function calculateRiChenGua(richenStr) {
+            if (richenStr.length !== 2) throw new Error("日辰干支需输入2个字符（如：甲子）");
+            const tgGua = TIANGAN_TO_TRIGRAM[richenStr[0]];
+            const dzGua = DIZHI_TO_TRIGRAM[richenStr[1]];
+            const result = trigramCalculate(tgGua, dzGua);
+            const log = [`  ${richenStr} → ${tgGua}${TRIGRAM_SYMBOL[tgGua]} + ${dzGua}${TRIGRAM_SYMBOL[dzGua]} → ${result}${TRIGRAM_SYMBOL[result]}`];
+            log.push(`  日辰卦归藏结果 → ${result}${TRIGRAM_SYMBOL[result]}`);
+            return { riChenGua: result, log };
+        }
+        // 计算方位/数字卦
+        function calculateFangWeiGua(inputStr) {
+            const trimmed = inputStr.trim();
+            if (DIRECTION_TO_TRIGRAM[trimmed]) {
+                const fwg = DIRECTION_TO_TRIGRAM[trimmed];
+                const log = [`  方位${trimmed} → ${fwg}${TRIGRAM_SYMBOL[fwg]}`];
+                return { fangWeiGua: fwg, type: '方位', log };
+            } else if (/^\d$/.test(trimmed)) {
+                const num = parseInt(trimmed);
+                if (!NUMBER_TO_TRIGRAM[num]) throw new Error("数字仅支持0-7");
+                const fwg = NUMBER_TO_TRIGRAM[num];
+                const log = [`  数字${num} → ${fwg}${TRIGRAM_SYMBOL[fwg]}`];
+                return { fangWeiGua: fwg, type: '数字', log };
+            } else {
+                throw new Error("支持方位（北/东北等8个）或数字（0-7）");
+            }
+        }
+        // 保存卦例到本地存储（优化：增加异常处理）
+        function saveDivinationResult(resultData) {
+            try {
+                const history = JSON.parse(localStorage.getItem('guicangHistory') || '[]');
+                const timestamp = new Date().toISOString();
+                const id = Date.now().toString(); // 唯一ID
+                const savedData = {
+                    id,
+                    timestamp,
+                    ...resultData
+                };
+                history.unshift(savedData); // 最新的在前面
+                localStorage.setItem('guicangHistory', JSON.stringify(history));
+                return savedData;
+            } catch (e) {
+                alert("保存卦例失败：本地存储异常");
+                return null;
+            }
+        }
+        // 获取所有卦例（优化：增加异常处理）
+        function getAllDivinationResults() {
+            try {
+                return JSON.parse(localStorage.getItem('guicangHistory') || '[]');
+            } catch (e) {
+                localStorage.removeItem('guicangHistory'); // 重置损坏的存储
+                return [];
+            }
+        }
+        // 删除卦例
+        function deleteDivinationResult(id) {
+            try {
+                let history = JSON.parse(localStorage.getItem('guicangHistory') || '[][]');
+                history = history.filter(item => item.id !== id);
+                localStorage.setItem('guicangHistory', JSON.stringify(history));
+                return true;
+            } catch (e) {
+                alert("删除卦例失败：本地存储异常");
+                return false;
+            }
+        }
+        // 格式化时间
+        function formatTime(isoStr) {
+            const date = new Date(isoStr);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+        // ==================== 页面交互 ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            // 页面元素
+            const mainMenu = document.getElementById('mainMenu');
+            const divinationForm = document.getElementById('divinationForm');
+            const resultSection = document.getElementById('resultSection');
+            const historySection = document.getElementById('historySection');
+            const operationLog = document.getElementById('operationLog');
+            const resultTable = document.getElementById('resultTable');
+            const interpretationContent = document.getElementById('interpretationContent'); // 解读内容容器
+            const interpretationBtnGroup = document.getElementById('interpretationBtnGroup'); // 切换按钮容器
+            const saveResultBtn = document.getElementById('saveResultBtn'); // 保存按钮单独容器
+            const historyList = document.getElementById('historyList');
+            const backToMainBtn = document.querySelectorAll('.back-to-main');
+            const backToFormBtn = document.getElementById('backToForm');
+            // 初始化当前干支
+            document.getElementById('richenInput').value = getCurrentGanZhi();
+            // 返回主菜单
+            backToMainBtn.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    mainMenu.classList.remove('hidden');
+                    divinationForm.classList.add('hidden');
+                    resultSection.classList.add('hidden');
+                    historySection.classList.add('hidden');
+                });
+            });
+            // 返回排盘表单
+            backToFormBtn.addEventListener('click', function() {
+                divinationForm.classList.remove('hidden');
+                resultSection.classList.add('hidden');
+            });
+            // 主菜单操作
+            document.getElementById('startDivination').addEventListener('click', function() {
+                mainMenu.classList.add('hidden');
+                divinationForm.classList.remove('hidden');
+            });
+            document.getElementById('viewHistory').addEventListener('click', function() {
+                mainMenu.classList.add('hidden');
+                historySection.classList.remove('hidden');
+                renderHistoryList();
+            });
+            document.getElementById('exitApp').addEventListener('click', function() {
+                if (confirm('确定要退出系统吗？')) {
+                    window.close();
+                }
+            });
+            // 排盘表单提交
+            document.getElementById('submitForm').addEventListener('click', function() {
+                try {
+                    // 清空日志和结果
+                    operationLog.innerHTML = '';
+                    resultTable.innerHTML = '';
+                    interpretationContent.innerHTML = '';
+                    interpretationBtnGroup.innerHTML = '';
+                    saveResultBtn.innerHTML = '';
+                    // 获取输入值
+                    const baziInput = document.getElementById('baziInput').value.trim();
+                    const richenInput = document.getElementById('richenInput').value.trim() || getCurrentGanZhi();
+                    const fwInput = document.getElementById('fwInput').value.trim();
+                    // 验证输入
+                    if (!baziInput) throw new Error("请输入生辰八字");
+                    parseBaZi(baziInput); // 验证格式
+                    // 计算各卦
+                    const { mingGua, log: mingLog } = calculateMingGua(baziInput);
+                    const { riChenGua, log: riChenLog } = calculateRiChenGua(richenInput);
+                    const { fangWeiGua, type, log: fwLog } = calculateFangWeiGua(fwInput);
+                    // 最终归藏卦
+                    const finalTrigrams = [mingGua, riChenGua, fangWeiGua];
+                    const guicangGua = multipleTrigramCalculate(finalTrigrams);
+                    // 大小游年
+                    const mingGame = GAME_YEAR_MAP[mingGua];
+                    const riChenGame = GAME_YEAR_MAP[riChenGua];
+                    const fwGame = GAME_YEAR_MAP[fangWeiGua];
+                    const guicangGame = GAME_YEAR_MAP[guicangGua];
+                    // 输出日志
+                    const log = [
+                        '【运算过程】',
+                        '1. 命卦计算：',
+                        ...mingLog,
+                        '',
+                        '2. 日辰卦计算：',
+                        ...riChenLog,
+                        '',
+                        `3. ${type}卦计算：`,
+                        ...fwLog,
+                        '',
+                        `4. 最终归藏运算：${finalTrigrams.map(g => `${g}${TRIGRAM_SYMBOL[g]}`).join(' ⊕ ')}`,
+                        `  归藏卦结果 → ${guicangGua}${TRIGRAM_SYMBOL[guicangGua]}`
+                    ];
+                    operationLog.innerHTML = log.join('<br>');
+                    // 构建结果数据
+                    const resultData = {
+                        生辰八字: baziInput,
+                        日辰干支: richenInput,
+                        方位数字: fwInput,
+                        方位数字类型: type,
+                        命卦: mingGua,
+                        命卦大游年: mingGame['大游年'],
+                        命卦小游年: mingGame['小游年'],
+                        日辰卦: riChenGua,
+                        日辰大游年: riChenGame['大游年'],
+                        日辰小游年: riChenGame['小游年'],
+                        方位卦: fangWeiGua,
+                        方位大游年: fwGame['大游年'],
+                        方位小游年: fwGame['小游年'],
+                        归藏卦: guicangGua,
+                        归藏大游年: guicangGame['大游年'],
+                        归藏小游年: guicangGame['小游年']
+                    };
+                    // 渲染结果表格（修复表格标签错误：<<<th 改为 <<th）
+                    const tableHtml = `
+                        <tr class="bg-gray-100">
+                            <<th class="border px-4 py-2 text-left">类别</</th>
+                            <<th class="border px-4 py-2 text-left">卦名</</th>
+                            <<th class="border px-4 py-2 text-left">符号</</th>
+                            <<th class="border px-4 py-2 text-left">大游年</</th>
+                            <<th class="border px-4 py-2 text-left">小游年</</th>
+                        </tr>
+                        <tr>
+                            <td class="border px-4 py-2">命卦</td>
+                            <td class="border px-4 py-2">${mingGua}</td>
+                            <td class="border px-4 py-2 text-2xl">${TRIGRAM_SYMBOL[mingGua]}</td>
+                            <td class="border px-4 py-2 ${mingGame['大游年'].includes('吉') ? 'text-green-600' : 'text-red-600'}">${mingGame['大游年']}</td>
+                            <td class="border px-4 py-2 ${mingGame['小游年'].includes('吉') ? 'text-green-600' : 'text-red-600'}">${mingGame['小游年']}</td>
+                        </tr>
+                        <tr>
+                            <td class="border px-4 py-2">日辰</td>
+                            <td class="border px-4 py-2">${riChenGua}</td>
+                            <td class="border px-4 py-2 text-2xl">${TRIGRAM_SYMBOL[riChenGua]}</td>
+                            <td class="border px-4 py-2 ${riChenGame['大游年'].includes('吉') ? 'text-green-600' : 'text-red-600'}">${riChenGame['大游年']}</td>
+                            <td class="border px-4 py-2 ${riChenGame['小游年'].includes('吉') ? 'text-green-600' : 'text-red-600'}">${riChenGame['小游年']}</td>
+                        </tr>
+                        <tr>
+                            <td class="border px-4 py-2">${type}</td>
+                            <td class="border px-4 py-2">${fangWeiGua}</td>
+                            <td class="border px-4 py-2 text-2xl">${TRIGRAM_SYMBOL[fangWeiGua]}</td>
+                            <td class="border px-4 py-2 ${fwGame['大游年'].includes('吉') ? 'text-green-600' : 'text-red-600'}">${fwGame['大游年']}</td>
+                            <td class="border px-4 py-2 ${fwGame['小游年'].includes('吉') ? 'text-green-600' : 'text-red-600'}">${fwGame['小游年']}</td>
+                        </tr>
+                        <tr class="bg-yellow-50">
+                            <td class="border px-4 py-2 font-bold">归藏卦</td>
+                            <td class="border px-4 py-2 font-bold">${guicangGua}</td>
+                            <td class="border px-4 py-2 text-3xl font-bold">${TRIGRAM_SYMBOL[guicangGua]}</td>
+                            <td class="border px-4 py-2 font-bold ${guicangGame['大游年'].includes('吉') ? 'text-green-600' : 'text-red-600'}">${guicangGame['大游年']}</td>
+                            <td class="border px-4 py-2 font-bold ${guicangGame['小游年'].includes('吉') ? 'text-green-600' : 'text-red-600'}">${guicangGame['小游年']}</td>
+                        </tr>
+                    `;
+                    resultTable.innerHTML = tableHtml;
+                    // 渲染解读（默认简易）
+                    renderInterpretation(guicangGua, 'simple');
+                    // 渲染保存按钮
+                    saveResultBtn.innerHTML = `
+                        <button id="saveResult" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 mr-2">
+                            保存卦例
+                        </button>
+                    `;
+                    // 保存卦例事件
+                    document.getElementById('saveResult').addEventListener('click', function() {
+                        const savedData = saveDivinationResult(resultData);
+                        if (savedData) {
+                            alert(`卦例保存成功！\n生成时间：${formatTime(savedData.timestamp)}`);
+                            this.disabled = true;
+                            this.textContent = '已保存';
+                        }
+                    });
+                    // 显示结果页面
+                    divinationForm.classList.add('hidden');
+                    resultSection.classList.remove('hidden');
+                } catch (error) {
+                    alert(`错误：${error.message}`);
+                }
+            });
+            // 渲染解读（核心修复：分离内容和按钮容器，避免冲突）
+            function renderInterpretation(guicangGua, type) {
+                const guaData = TRIGRAM_TEXT[guicangGua];
+                let contentHtml = `
+                    <div class="mb-4">
+                        <h4 class="text-lg font-semibold mb-2">卦辞：</h4>
+                        <p class="text-gray-700">${guaData['卦辞']}</p>
+                    </div>
+                `;
+                // 解读内容
+                if (type === 'simple') {
+                    contentHtml += `
+                        <div class="mb-4">
+                            <h4 class="text-lg font-semibold mb-2">简易解读：</h4>
+                            <p class="text-gray-700">${guaData['简易解读']}</p>
+                        </div>
+                    `;
+                    // 切换按钮
+                    interpretationBtnGroup.innerHTML = `
+                        <button id="toDeepBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                            查看深度解读
+                        </button>
+                    `;
+                    // 绑定深度解读事件
+                    document.getElementById('toDeepBtn').addEventListener('click', function() {
+                        renderInterpretation(guicangGua, 'deep');
+                    });
+                } else {
+                    contentHtml += `
+                        <div class="mb-4">
+                            <h4 class="text-lg font-semibold mb-2">深度解读：</h4>
+                            <p class="text-gray-700">${guaData['深度解读']}</p>
+                        </div>
+                    `;
+                    // 切换按钮
+                    interpretationBtnGroup.innerHTML = `
+                        <button id="toSimpleBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                            查看简易解读
+                        </button>
+                    `;
+                    // 绑定简易解读事件
+                    document.getElementById('toSimpleBtn').addEventListener('click', function() {
+                        renderInterpretation(guicangGua, 'simple');
+                    });
+                }
+                // 渲染到对应的容器
+                interpretationContent.innerHTML = contentHtml;
+            }
+            // 渲染历史列表（修复表格标签错误：<<<th 改为 <<th）
+            function renderHistoryList() {
+                const history = getAllDivinationResults();
+                if (history.length === 0) {
+                    historyList.innerHTML = '<tr><td colspan="6" class="border px-4 py-8 text-center text-gray-500">暂无保存的卦例</td></tr>';
+                    return;
+                }
+                let tableHtml = `
+                    <tr class="bg-gray-100">
+                        <<th class="border px-4 py-2 text-left">生成时间</</th>
+                        <<th class="border px-4 py-2 text-left">生辰八字</</th>
+                        <<th class="border px-4 py-2 text-left">归藏卦</</th>
+                        <<th class="border px-4 py-2 text-left">大游年</</th>
+                        <<th class="border px-4 py-2 text-left">小游年</</th>
+                        <<th class="border px-4 py-2 text-center">操作</</th>
+                    </tr>
+                `;
+                for (const item of history) {
+                    tableHtml += `
+                        <tr>
+                            <td class="border px-4 py-2">${formatTime(item.timestamp)}</td>
+                            <td class="border px-4 py-2">${item['生辰八字']}</td>
+                            <td class="border px-4 py-2">${item['归藏卦']}${TRIGRAM_SYMBOL[item['归藏卦']]}</td>
+                            <td class="border px-4 py-2 ${item['归藏大游年'].includes('吉') ? 'text-green-600' : 'text-red-600'}">${item['归藏大游年']}</td>
+                            <td class="border px-4 py-2 ${item['归藏小游年'].includes('吉') ? 'text-green-600' : 'text-red-600'}">${item['归藏小游年']}</td>
+                            <td class="border px-4 py-2 text-center">
+                                <button class="view-detail bg-blue-500 text-white px-2 py-1 rounded text-sm hover:bg-blue-600 mr-1" data-id="${item.id}">查看</button>
+                                <button class="delete-item bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600" data-id="${item.id}">删除</button>
+                            </td>
+                        </tr>
+                    `;
+                }
+                historyList.innerHTML = tableHtml;
+                // 查看详情事件
+                document.querySelectorAll('.view-detail').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = this.getAttribute('data-id');
+                        const history = getAllDivinationResults();
+                        const item = history.find(i => i.id === id);
+                        if (!item) return;
+                        // 渲染详情表格（修复表格标签错误：<<<th 改为 <<th）
+                        const detailHtml = `
+                            <tr class="bg-gray-100">
+                                <<th class="border px-4 py-2 text-left">类别</</th>
+                                <<th class="border px-4 py-2 text-left">卦名</</th>
+                                <<th class="border px-4 py-2 text-left">符号</</th>
+                                <<th class="border px-4 py-2 text-left">大游年</</th>
+                                <<th class="border px-4 py-2 text-left">小游年</</th>
+                            </tr>
+                            <tr>
+                                <td class="border px-4 py-2">命卦</td>
+                                <td class="border px-4 py-2">${item['命卦']}</td>
+                                <td class="border px-4 py-2 text-2xl">${TRIGRAM_SYMBOL[item['命卦']]}</td>
+                                <td class="border px-4 py-2 ${item['命卦大游年'].includes('吉') ? 'text-green-600' : 'text-red-600'}">${item['命卦大游年']}</td>
+                                <td class="border px-4 py-2 ${item['命卦小游年'].includes('吉') ? 'text-green-600' : 'text-red-600'}">${item['命卦小游年']}</td>
+                            </tr>
+                            <tr>
+                                <td class="border px-4 py-2">日辰</td>
+                                <td class="border px-4 py-2">${item['日辰卦']}</td>
+                                <td class="border px-4 py-2 text-2xl">${TRIGRAM_SYMBOL[item['日辰卦']]}</td>
+                                <td class="border px-4 py-2 ${item['日辰大游年'].includes('吉') ? 'text-green-600' : 'text-red-600'}">${item['日辰大游年']}</td>
+                                <td class="border px-4 py-2 ${item['日辰小游年'].includes('吉') ? 'text-green-600' : 'text-red-600'}">${item['日辰小游年']}</td>
+                            </tr>
+                            <tr>
+                                <td class="border px-4 py-2">${item['方位数字类型']}</td>
+                                <td class="border px-4 py-2">${item['方位卦']}</td>
+                                <td class="border px-4 py-2 text-2xl">${TRIGRAM_SYMBOL[item['方位卦']]}</td>
+                                <td class="border px-4 py-2 ${item['方位大游年'].includes('吉') ? 'text-green-600' : 'text-red-600'}">${item['方位大游年']}</td>
+                                <td class="border px-4 py-2 ${item['方位小游年'].includes('吉') ? 'text-green-600' : 'text-red-600'}">${item['方位小游年']}</td>
+                            </tr>
+                            <tr class="bg-yellow-50">
+                                <td class="border px-4 py-2 font-bold">归藏卦</td>
+                                <td class="border px-4 py-2 font-bold">${item['归藏卦']}</td>
+                                <td class="border px-4 py-2 text-3xl font-bold">${TRIGRAM_SYMBOL[item['归藏卦']]}</td>
+                                <td class="border px-4 py-2 font-bold ${item['归藏大游年'].includes('吉') ? 'text-green-600' : 'text-red-600'}">${item['归藏大游年']}</td>
+                                <td class="border px-4 py-2 font-bold ${item['归藏小游年'].includes('吉') ? 'text-green-600' : 'text-red-600'}">${item['归藏小游年']}</td>
+                            </tr>
+                        `;
+                        document.getElementById('historyDetailTable').innerHTML = detailHtml;
+                        // 渲染历史卦例解读（同时显示简易+深度，无需切换）
+                        const guicangGua = item['归藏卦'];
+                        const guaData = TRIGRAM_TEXT[guicangGua];
+                        const historyInterpretHtml = `
+                            <div class="mb-4">
+                                <h4 class="text-lg font-semibold mb-2">卦辞：</h4>
+                                <p class="text-gray-700">${guaData['卦辞']}</p>
+                            </div>
+                            <div class="mb-4">
+                                <h4 class="text-lg font-semibold mb-2">简易解读：</h4>
+                                <p class="text-gray-700">${guaData['简易解读']}</p>
+                            </div>
+                            <div class="mb-4">
+                                <h4 class="text-lg font-semibold mb-2">深度解读：</h4>
+                                <p class="text-gray-700">${guaData['深度解读']}</p>
+                            </div>
+                        `;
+                        document.getElementById('historyInterpretation').innerHTML = historyInterpretHtml;
+                        // 显示详情，隐藏列表
+                        document.getElementById('historyListContainer').classList.add('hidden');
+                        document.getElementById('historyDetailContainer').classList.remove('hidden');
+                    });
+                });
+                // 删除事件
+                document.querySelectorAll('.delete-item').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = this.getAttribute('data-id');
+                        if (confirm('确定要删除该卦例吗？删除后无法恢复！')) {
+                            deleteDivinationResult(id);
+                            renderHistoryList();
+                        }
+                    });
+                });
+            }
+            // 返回历史列表
+            document.getElementById('backToHistoryList').addEventListener('click', function() {
+                document.getElementById('historyDetailContainer').classList.add('hidden');
+                document.getElementById('historyListContainer').classList.remove('hidden');
+            });
+            // 清空所有历史
+            document.getElementById('clearAllHistory').addEventListener('click', function() {
+                if (confirm('确定要删除所有卦例吗？删除后无法恢复！')) {
+                    localStorage.removeItem('guicangHistory');
+                    renderHistoryList();
+                }
+            });
+        });
+    </script>
+</head>
+<body class="bg-gray-50 font-sans">
+    <div class="max-w-4xl mx-auto p-4 md:p-6">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">归藏易排盘系统（终极完整版）</h1>
+        <!-- 主菜单 -->
+        <div id="mainMenu" class="bg-white rounded-lg shadow-md p-6">
+            <div class="text-center mb-6">
+                <p class="text-gray-600 mb-4">功能：排盘+大小游年+双级解读+卦例保存+卦例查询+卦例删除</p>
+            </div>
+            <div class="flex flex-col md:flex-row justify-center gap-4">
+                <button id="startDivination" class="bg-blue-500 text-white px-6 py-3 rounded hover:bg-blue-600 transition">
+                    开始排盘
+                </button>
+                <button id="viewHistory" class="bg-green-500 text-white px-6 py-3 rounded hover:bg-green-600 transition">
+                    查询/删除历史卦例
+                </button>
+                <button id="exitApp" class="bg-red-500 text-white px-6 py-3 rounded hover:bg-red-600 transition">
+                    退出系统
+                </button>
+            </div>
+        </div>
+        <!-- 排盘表单 -->
+        <div id="divinationForm" class="bg-white rounded-lg shadow-md p-6 hidden">
+            <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">排盘参数输入</h2>
+            <div class="space-y-4">
+                <div>
+                    <label for="baziInput" class="block text-gray-700 font-medium mb-1">生辰八字</label>
+                    <input type="text" id="baziInput" class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="如：甲子甲子甲子甲子（8个字符）">
+                </div>
+                <div>
+                    <label for="richenInput" class="block text-gray-700 font-medium mb-1">日辰干支</label>
+                    <input type="text" id="richenInput" class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="如：甲子（2个字符，回车默认当前干支）">
+                </div>
+                <div>
+                    <label for="fwInput" class="block text-gray-700 font-medium mb-1">方位/数字</label>
+                    <input type="text" id="fwInput" class="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="支持方位（北/东北等8个）或数字（0-7）">
+                </div>
+                <div class="flex justify-center gap-4 mt-6">
+                    <button id="submitForm" class="bg-blue-500 text-white px-6 py-3 rounded hover:bg-blue-600 transition">
+                        开始排盘
+                    </button>
+                    <button class="back-to-main bg-gray-500 text-white px-6 py-3 rounded hover:bg-gray-600 transition">
+                        返回主菜单
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- 排盘结果（核心修复：拆分解读容器为“内容+按钮+保存”，避免DOM冲突） -->
+        <div id="resultSection" class="bg-white rounded-lg shadow-md p-6 hidden">
+            <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">排盘结果</h2>
+            
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold mb-3">运算过程</h3>
+                <div id="operationLog" class="bg-gray-50 p-4 rounded border text-gray-700 whitespace-pre-line"></div>
+            </div>
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold mb-3">卦象结果</h3>
+                <table id="resultTable" class="w-full border-collapse"></table>
+            </div>
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold mb-3">卦辞解读</h3>
+                <div id="interpretationContent" class="text-gray-700"></div> <!-- 解读内容 -->
+                <div id="interpretationBtnGroup" class="mb-4"></div> <!-- 切换按钮 -->
+                <div id="saveResultBtn"></div> <!-- 保存按钮 -->
+            </div>
+            <div class="flex justify-center gap-4">
+                <button id="backToForm" class="bg-blue-500 text-white px-6 py-3 rounded hover:bg-blue-600 transition">
+                    重新排盘
+                </button>
+                <button class="back-to-main bg-gray-500 text-white px-6 py-3 rounded hover:bg-gray-600 transition">
+                    返回主菜单
+                </button>
+            </div>
+        </div>
+        <!-- 历史卦例 -->
+        <div id="historySection" class="bg-white rounded-lg shadow-md p-6 hidden">
+            <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">历史卦例管理</h2>
+            <!-- 历史列表 -->
+            <div id="historyListContainer">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold">卦例列表</h3>
+                    <button id="clearAllHistory" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 text-sm">
+                        清空所有卦例
+                    </button>
+                </div>
+                <table class="w-full border-collapse">
+                    <tbody id="historyList"></tbody>
+                </table>
+            </div>
+            <!-- 卦例详情 -->
+            <div id="historyDetailContainer" class="hidden">
+                <h3 class="text-xl font-semibold mb-3">卦例详情</h3>
+                <table id="historyDetailTable" class="w-full border-collapse mb-6"></table>
+                <div id="historyInterpretation" class="text-gray-700 mb-6"></div>
+                <button id="backToHistoryList" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    返回列表
+                </button>
+            </div>
+            <div class="flex justify-center mt-6">
+                <button class="back-to-main bg-gray-500 text-white px-6 py-3 rounded hover:bg-gray-600 transition">
+                    返回主菜单
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
